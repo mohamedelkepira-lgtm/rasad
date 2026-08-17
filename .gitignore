@@ -1,0 +1,39 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+dist-ssr/
+
+# Env files (secrets — never commit)
+.env
+.env.*
+!.env.example
+.env.local
+.env.*.local
+
+# Supabase local temp (tokens/passwords)
+supabase/.temp/
+supabase/.branches/
+supabase/.env
+
+# Logs
+*.log
+npm-debug.log*
+
+# Editor/OS
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json
+.idea/
+
+.vercel
+
+# Local runtime / temp test files
+ip.txt
+*.bat
+_*.mjs
+_chrome_test_profile/
+build_ppt.py
+*.pptx
