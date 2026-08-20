@@ -16,6 +16,7 @@ const StudentPage = lazy(() => import('./pages/StudentPage'))
 const Violations = lazy(() => import('./pages/Violations'))
 const ViolationDetail = lazy(() => import('./pages/ViolationDetail'))
 const Reports = lazy(() => import('./pages/Reports'))
+const Scan = lazy(() => import('./pages/Scan'))
 
 function PageFallback() {
   return <div className="loading"><div className="spinner" />جارٍ فتح الصفحة...</div>
@@ -55,6 +56,7 @@ export default function App() {
                 <Route path="/violations" element={<Violations />} />
                 <Route path="/violations/:id" element={<ViolationDetail />} />
                 <Route path="/reports" element={<AdminOnly><Reports /></AdminOnly>} />
+                <Route path="/scan" element={<Scan />} />
               </Route>
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>

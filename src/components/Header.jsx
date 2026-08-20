@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { NavLink, useNavigate, useLocation } from 'react-router-dom'
 import {
   Radar, Home, Users, AlertTriangle, BarChart3, Search, Bell,
-  ChevronDown, LogOut, Plus, Menu, X, Sun, UserRound, ShieldCheck
+  ChevronDown, LogOut, Plus, Menu, X, Sun, UserRound, ShieldCheck, ScanLine
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { getDashboardStats, searchStudents } from '../lib/api'
@@ -12,6 +12,7 @@ import { useToast } from '../context/ToastContext'
 const NAV_ITEMS = [
   { to: '/', label: 'الرئيسية', icon: <Home size={16} strokeWidth={2.2} />, end: true },
   { to: '/students', label: 'الطلاب', icon: <Users size={16} strokeWidth={2.2} /> },
+  { to: '/scan', label: 'مسح QR', icon: <ScanLine size={16} strokeWidth={2.2} /> },
   { to: '/violations', label: 'المخالفات', icon: <AlertTriangle size={16} strokeWidth={2.2} /> },
   { to: '/reports', label: 'التقارير', icon: <BarChart3 size={16} strokeWidth={2.2} /> }
 ]

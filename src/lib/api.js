@@ -119,7 +119,7 @@ export async function deleteViolation(id) {
 export async function searchStudents(q, activeOnly = true) {
   const key = `search:${activeOnly}:${(q || '').toLowerCase()}`
   return withCache(key, TTL.search, async () => {
-    let query = supabase.from('students').select('id, student_code, name, class_name, active')
+    let query = supabase.from('students').select('id, student_code, official_student_id, name, class_name, active')
     if (q) query = query.ilike('name', `%${q}%`)
     if (activeOnly) query = query.eq('active', true)
     query = query.order('name').limit(30)
@@ -133,11 +133,35 @@ export async function fetchStudents() {
   return withCache('students', TTL.students, async () => {
     const { data, error } = await supabase
       .from('students')
-      .select('id, student_code, name, class_name, active')
+      .select('id, student_code, official_student_id, name, class_name, active')
       .order('name')
     if (error) throw error
     return data || []
   })
+}
+
+// البحث عن طالب بمعرّف البطاقة (الرقم الرسمي، أو الرمز، أو الـ UUID الاحتياطي)
+// تُستخدم بعد فك الـ QR — نثق فقط بالمعرّف ثم نجلب بيانات الطالب من Supabase
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+export async function findStudentByCardId(cardId) {
+  const card = String(cardId || '').trim()
+  if (!card) return null
+  const { data, error } = await supabase
+    .from('students')
+    .select('*')
+    .or(`official_student_id.eq.${card},student_code.eq.${card}`)
+    .maybeSingle()
+  if (error) throw error
+  if (data) return data
+  if (!UUID_RE.test(card)) return null
+  const { data: byId, error: idErr } = await supabase
+    .from('students')
+    .select('*')
+    .eq('id', card)
+    .maybeSingle()
+  if (idErr) throw idErr
+  return byId || null
 }
 
 export async function getStudentsWithCounts(month) {
