@@ -248,8 +248,8 @@ export default function SchedulePage() {
       )}
 
       {modalDay && (
-        <div className="modal-overlay qr-zoom-overlay" onClick={() => setOpenDay(null)}>
-          <div className="modal qr-zoom-modal sched-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-overlay sched-modal-overlay" onClick={() => setOpenDay(null)}>
+          <div className="modal sched-modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-head">
               <div className="modal-title">مناوبة يوم {weekdayAr(modalDay.duty_date)} {dateAr(modalDay.duty_date)}</div>
               <button className="modal-close" onClick={() => setOpenDay(null)} aria-label="إغلاق"><X size={18} /></button>

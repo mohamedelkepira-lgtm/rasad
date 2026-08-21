@@ -2,12 +2,18 @@ import { useEffect, useRef, useState } from 'react'
 import { NavLink, useNavigate, useLocation } from 'react-router-dom'
 import {
   Radar, Home, Users, AlertTriangle, BarChart3, Search, Bell,
-  ChevronDown, LogOut, Plus, Menu, X, Sun, UserRound, ShieldCheck, ScanLine, CalendarDays
+  LogOut, Plus, Menu, X, Sun, UserRound, ShieldCheck, ScanLine,
+  CalendarDays, CheckCircle2, Clock
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
-import { getDashboardStats, searchStudents } from '../lib/api'
+import { getDashboardStats, searchStudents, fetchTodayDuty, fetchMyNextDuty } from '../lib/api'
 import { isSupabaseConfigured } from '../lib/supabase'
 import { useToast } from '../context/ToastContext'
+
+function dutyDateLabel(ds) {
+  const [y, m, d] = ds.split('-').map(Number)
+  return new Date(y, m - 1, d).toLocaleDateString('ar-EG', { weekday: 'long', day: 'numeric', month: 'long' })
+}
 
 const NAV_ITEMS = [
   { to: '/', label: 'الرئيسية', icon: <Home size={16} strokeWidth={2.2} />, end: true },
@@ -30,6 +36,9 @@ export default function Header() {
   const [results, setResults] = useState([])
   const [searching, setSearching] = useState(false)
   const [notifCount, setNotifCount] = useState(0)
+  const [notifOpen, setNotifOpen] = useState(false)
+  const [notifItems, setNotifItems] = useState([])
+  const [notifLoading, setNotifLoading] = useState(false)
   const debounce = useRef(null)
   const searchRef = useRef(null)
 
@@ -39,18 +48,24 @@ export default function Header() {
 
   const navItems = isAdmin ? NAV_ITEMS : NAV_ITEMS.filter((i) => i.to !== '/reports' && i.to !== '/violations')
 
-  // إشعارات: مخالفات اليوم (عدد حقيقي من النظام) — للأدمن فقط
+  // إشعارات: للأدمن مخالفات اليوم — للقائد تنبيه المناوبة
   useEffect(() => {
-    if (!isSupabaseConfigured || !isAdmin) return
+    if (!isSupabaseConfigured) return
     let cancelled = false
     ;(async () => {
       try {
-        const stats = await getDashboardStats()
-        if (!cancelled) setNotifCount(stats?.todayCount ?? 0)
+        if (isAdmin) {
+          const stats = await getDashboardStats()
+          if (!cancelled) setNotifCount(stats?.todayCount ?? 0)
+        } else if (profile?.id) {
+          const t = await fetchTodayDuty()
+          const mine = t?.assignments?.find((a) => a.leader_id === profile.id)
+          if (!cancelled) setNotifCount(mine && !mine.attendance ? 1 : 0)
+        }
       } catch { /* silent */ }
     })()
     return () => { cancelled = true }
-  }, [isAdmin])
+  }, [isAdmin, profile?.id])
 
   // بحث فوري
   useEffect(() => {
@@ -94,6 +109,56 @@ export default function Header() {
       toast('تعذر تسجيل الخروج', 'error')
     }
   }
+
+  // فتح/إغلاق بانل الإشعارات مع تحميل المحتوى الفعلي
+  const toggleNotif = async () => {
+    const next = !notifOpen
+    setNotifOpen(next)
+    if (!next) return
+    setNotifLoading(true)
+    setNotifItems([])
+    try {
+      if (isAdmin) {
+        const s = await getDashboardStats()
+        const recent = s?.recent || []
+        setNotifItems(recent.length
+          ? recent.map((v) => ({
+              id: v.id,
+              icon: 'violation',
+              title: `${v.student?.name || 'طالب'} — ${v.category?.name || ''}${v.type?.name ? ' / ' + v.type.name : ''}`,
+              sub: v.leader?.name ? `سجلها ${v.leader.name}` : '',
+              to: `/violations/${v.id}`
+            }))
+          : [{ id: 'empty', icon: 'none', title: 'لا توجد مخالفات اليوم', sub: '', to: null }])
+      } else if (profile?.id) {
+        let items = []
+        const t = await fetchTodayDuty()
+        const mine = t?.assignments?.find((a) => a.leader_id === profile.id)
+        if (mine?.attendance) {
+          items = [{ id: 'done', icon: 'check', title: 'تم تأكيد حضورك اليوم بنجاح ✅', sub: 'مناوبة اليوم على البوابة', to: '/' }]
+        } else if (mine) {
+          items = [{ id: 'today', icon: 'bell', title: 'لديك مناوبة اليوم على البوابة 🔔', sub: 'اضغط للانتقال لتأكيد الحضور', to: '/' }]
+        } else {
+          const nd = await fetchMyNextDuty(profile.id)
+          items = nd
+            ? [{ id: 'next', icon: 'cal', title: 'مناوبتي القادمة 📅 ' + dutyDateLabel(nd.duty_date), sub: (nd.assignments || []).map((a) => a.leader?.name).filter(Boolean).join(' + '), to: '/schedule' }]
+            : [{ id: 'empty', icon: 'none', title: 'لا توجد مناوبة لك اليوم', sub: '', to: null }]
+        }
+        setNotifItems(items)
+      }
+    } catch {
+      setNotifItems([{ id: 'err', icon: 'none', title: 'تعذر تحميل الإشعارات', sub: '', to: null }])
+    } finally {
+      setNotifLoading(false)
+    }
+  }
+
+  const notifIcon = (icon) =>
+    icon === 'violation' ? <AlertTriangle size={15} /> :
+    icon === 'check' ? <CheckCircle2 size={15} /> :
+    icon === 'bell' ? <Bell size={15} /> :
+    icon === 'cal' ? <CalendarDays size={15} /> :
+    <Bell size={15} />
 
   const haptic = () => {
     if (navigator.vibrate) {
@@ -195,10 +260,49 @@ export default function Header() {
 
             <span className="header-divider" aria-hidden="true" />
 
-            <button className="header-icon-btn header-notif" title="إشعارات" aria-label="إشعارات">
-              <Bell size={19} strokeWidth={2.1} />
-              {notifCount > 0 && <span className="header-badge">{notifCount > 99 ? '99+' : notifCount}</span>}
-            </button>
+            <div className="header-notif-wrap">
+              <button
+                className={'header-icon-btn header-notif' + (notifOpen ? ' notif-open' : '')}
+                onClick={toggleNotif}
+                title="الإشعارات"
+                aria-label="الإشعارات"
+              >
+                <Bell size={19} strokeWidth={2.1} />
+                {notifCount > 0 && <span className="header-badge">{notifCount > 99 ? '99+' : notifCount}</span>}
+              </button>
+
+              {notifOpen && (
+                <>
+                  <div className="notif-backdrop" onClick={() => setNotifOpen(false)} />
+                  <div className="notif-panel">
+                    <div className="notif-head"><Bell size={13} /> الإشعارات</div>
+                    {notifLoading ? (
+                      <div className="notif-empty"><div className="spinner" /> جارٍ التحميل...</div>
+                    ) : notifItems.length === 0 ? (
+                      <div className="notif-empty">لا إشعارات حالياً</div>
+                    ) : (
+                      notifItems.map((it) => (
+                        <div
+                          key={it.id}
+                          className={'notif-item' + (it.to ? ' clickable' : '')}
+                          onClick={() => {
+                            setNotifOpen(false)
+                            if (it.to) navigate(it.to)
+                          }}
+                        >
+                          <span className={'notif-ic ic-' + it.icon}>{notifIcon(it.icon)}</span>
+                          <span className="notif-body">
+                            <span className="notif-title">{it.title}</span>
+                            {it.sub && <span className="notif-sub">{it.sub}</span>}
+                          </span>
+                          {it.icon === 'violation' && <Clock size={12} className="notif-time-ic" />}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
 
             <div className="header-user">
               <span className="header-avatar">{initial}</span>
@@ -209,7 +313,6 @@ export default function Header() {
                   {roleLabel}
                 </span>
               </span>
-              <ChevronDown size={16} className="header-chevron" />
             </div>
           </div>
         </div>
