@@ -2038,6 +2038,25 @@ tr:nth-child(even) td { background: #F8FAFE; }
 .qr-zoom-meta .student-name { margin-bottom: 4px; }
 .qr-zoom-meta .student-meta { justify-content: center; }
 
+/* ---------- Student ID card ---------- */
+.id-card-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 12px;
+}
+.card-modal { max-width: min(92vw, 430px); }
+.card-preview-wrap { margin-top: 12px; }
+.card-preview-canvas {
+  width: 100%;
+  height: auto;
+  display: block;
+  border-radius: 14px;
+  border: 1px solid var(--line, #E6EAF2);
+}
+
 /* ---------- Scan page ---------- */
 .scan-page { display: flex; flex-direction: column; }
 .scan-live { display: flex; flex-direction: column; }

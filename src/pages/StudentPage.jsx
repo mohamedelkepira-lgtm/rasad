@@ -1,9 +1,10 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowRight, AlertTriangle, ClipboardList, Plus, GraduationCap, Hash, CalendarDays, ChevronLeft, QrCode, Maximize2, Download, Printer, X } from 'lucide-react'
+import { ArrowRight, AlertTriangle, ClipboardList, Plus, GraduationCap, Hash, CalendarDays, ChevronLeft, QrCode, Maximize2, Download, Printer, X, IdCard, RefreshCw } from 'lucide-react'
 import { QRCodeSVG, QRCodeCanvas } from 'qrcode.react'
 import { fetchStudent, fetchStudentViolations } from '../lib/api'
 import { studentCardId, studentQrValue } from '../lib/studentQr'
+import { drawStudentCard, resolveTheme, CARD_W, CARD_H } from '../lib/studentCard'
 import { formatDate, formatTime, monthKey } from '../lib/utils'
 import { isSupabaseConfigured } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
@@ -16,6 +17,7 @@ export default function StudentPage() {
   const [violations, setViolations] = useState([])
   const [loading, setLoading] = useState(true)
   const [qrZoom, setQrZoom] = useState(false)
+  const [cardOpen, setCardOpen] = useState(false)
 
   const load = useCallback(async () => {
     if (!isSupabaseConfigured) return
@@ -37,6 +39,25 @@ export default function StudentPage() {
   useEffect(() => {
     load()
   }, [load])
+
+  // ---- كارنيه الطالب (Admin فقط) ----
+  const renderCard = useCallback(async () => {
+    const canvas = document.getElementById('student-card-canvas')
+    if (!canvas || !student) return
+    try { await document.fonts.ready } catch { /* noop */ }
+    const qrSrc = document.getElementById('student-card-qr-src')
+    drawStudentCard(canvas, {
+      name: student.name,
+      className: student.class_name,
+      code: studentCardId(student),
+      qrCanvas: qrSrc,
+      theme: resolveTheme(student)
+    })
+  }, [student])
+
+  useEffect(() => {
+    if (cardOpen) renderCard()
+  }, [cardOpen, renderCard])
 
   if (!isSupabaseConfigured) {
     return <div className="setup-notice"><b>تعذر الاتصال بالنظام.</b> راجع الإعدادات.</div>
@@ -92,6 +113,35 @@ export default function StudentPage() {
       <div class="meta">الفصل: ${student.class_name}</div>
       <img class="qr" src="${img}" alt="QR ${cardId}" />
       <div class="id">${cardId}</div>
+      <script>window.onload=function(){setTimeout(function(){window.print()},400)}<\/script>
+    </body></html>`)
+    w.document.close()
+  }
+
+  const downloadCard = () => {
+    const canvas = document.getElementById('student-card-canvas')
+    if (!canvas) return
+    const a = document.createElement('a')
+    a.href = canvas.toDataURL('image/png')
+    a.download = `student-card-${cardId}.png`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+  }
+
+  const printCard = () => {
+    const canvas = document.getElementById('student-card-canvas')
+    if (!canvas) return
+    const img = canvas.toDataURL('image/png')
+    const w = window.open('', '_blank', 'width=480,height=760')
+    if (!w) return
+    w.document.write(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>كارنيه ${cardId}</title>
+      <style>
+        @page{size:auto;margin:8mm}
+        body{margin:0;text-align:center}
+        img{width:86mm;display:block;margin:0 auto}
+      </style></head><body>
+      <img src="${img}" alt="كارنيه ${cardId}" />
       <script>window.onload=function(){setTimeout(function(){window.print()},400)}<\/script>
     </body></html>`)
     w.document.close()
@@ -190,6 +240,32 @@ export default function StudentPage() {
             </div>
           )}
         </>
+      )}
+
+      {isAdmin && qrValue && (
+        <button className="btn btn-primary id-card-btn" onClick={() => setCardOpen(true)}>
+          <IdCard size={17} /> توليد كارنيه الطالب
+        </button>
+      )}
+
+      {cardOpen && (
+        <div className="modal-overlay qr-zoom-overlay" onClick={() => setCardOpen(false)}>
+          <div className="modal qr-zoom-modal card-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-head">
+              <h3>كارنيه الطالب</h3>
+              <button className="modal-close" onClick={() => setCardOpen(false)} aria-label="إغلاق"><X size={17} /></button>
+            </div>
+            <div className="card-preview-wrap">
+              <canvas id="student-card-canvas" width={CARD_W} height={CARD_H} className="card-preview-canvas" />
+            </div>
+            <div className="qr-actions qr-actions-lg">
+              <button className="btn btn-primary btn-sm" onClick={downloadCard}><Download size={14} /> تحميل الكارنيه</button>
+              <button className="btn btn-ghost btn-sm" onClick={printCard}><Printer size={14} /> طباعة الكارنيه</button>
+              <button className="btn btn-ghost btn-sm" onClick={renderCard}><RefreshCw size={14} /> إعادة التوليد</button>
+            </div>
+          </div>
+          <QRCodeCanvas id="student-card-qr-src" value={qrValue || ''} size={620} level="M" style={{ display: 'none' }} />
+        </div>
       )}
 
       {qrZoom && qrValue && (
