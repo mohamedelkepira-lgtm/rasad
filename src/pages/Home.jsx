@@ -1,13 +1,20 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { AlertTriangle, Users, CalendarDays, Megaphone, Search, TrendingUp, ChevronLeft, Plus, ShieldCheck, UserRound, ClipboardList, BarChart3 } from 'lucide-react'
-import { getDashboardStats, searchStudents } from '../lib/api'
+import { AlertTriangle, Users, CalendarDays, Megaphone, Search, TrendingUp, ChevronLeft, Plus, ShieldCheck, UserRound, ClipboardList, BarChart3, CheckCircle2, BellRing } from 'lucide-react'
+import { getDashboardStats, searchStudents, fetchTodayDuty, fetchMyNextDuty, confirmMyAttendance } from '../lib/api'
 import { timeAgo } from '../lib/utils'
 import { useAuth } from '../context/AuthContext'
+import { useToast } from '../context/ToastContext'
 import { isSupabaseConfigured } from '../lib/supabase'
+
+function dutyDateLabel(ds) {
+  const [y, m, d] = ds.split('-').map(Number)
+  return new Date(y, m - 1, d).toLocaleDateString('ar-EG', { weekday: 'long', day: 'numeric', month: 'long' })
+}
 
 export default function Home() {
   const { profile, isAdmin } = useAuth()
+  const { toast } = useToast()
   const navigate = useNavigate()
   const [stats, setStats] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -16,6 +23,11 @@ export default function Home() {
   const [searching, setSearching] = useState(false)
   const [focused, setFocused] = useState(false)
   const debounce = useRef(null)
+
+  // مناوبتي (للقائد فقط)
+  const [duty, setDuty] = useState(undefined) // undefined=تحميل، null=لا يوجد، object=يوم اليوم
+  const [nextDuty, setNextDuty] = useState(null)
+  const [confirming, setConfirming] = useState(false)
 
   const firstName = profile?.name?.split(' ')[0] || 'مستخدم'
   const todayLabel = new Date().toLocaleDateString('ar-EG', { weekday: 'long', day: 'numeric', month: 'long' })
@@ -40,6 +52,47 @@ export default function Home() {
   useEffect(() => {
     load()
   }, [load])
+
+  // جدول المناوبة للقائد: هل أنا مكلف اليوم؟ وما أقرب مناوبة قادمة؟
+  const loadDuty = useCallback(async () => {
+    if (!isSupabaseConfigured || isAdmin || !profile?.id) {
+      setDuty(null)
+      setNextDuty(null)
+      return
+    }
+    try {
+      const [today, next] = await Promise.all([fetchTodayDuty(), fetchMyNextDuty(profile.id)])
+      setDuty(today)
+      // أقرب مناوبة قادمة — نتجاهلها إن كانت مناوبة اليوم نفسه
+      const mineToday = today?.assignments?.some((a) => a.leader_id === profile.id)
+      setNextDuty(mineToday ? null : next)
+    } catch {
+      setDuty(null)
+      setNextDuty(null)
+    }
+  }, [isAdmin, profile?.id])
+
+  useEffect(() => {
+    loadDuty()
+  }, [loadDuty])
+
+  const handleConfirmDuty = async () => {
+    const mine = duty?.assignments?.find((a) => a.leader_id === profile?.id)
+    if (!mine) return
+    setConfirming(true)
+    try {
+      await confirmMyAttendance(mine.id)
+      await loadDuty()
+      toast('تم تأكيد حضور المناوبة بنجاح ✅', 'success')
+    } catch (e) {
+      const msg = /duplicate|unique/i.test(e?.message || '')
+        ? 'تم تسجيل حضورك بالفعل لهذا اليوم.'
+        : (e?.message || 'تعذر تأكيد الحضور')
+      toast(msg, 'error')
+    } finally {
+      setConfirming(false)
+    }
+  }
 
   useEffect(() => {
     if (debounce.current) clearTimeout(debounce.current)
@@ -66,6 +119,14 @@ export default function Home() {
     setFocused(false)
     navigate(`/students/${id}`)
   }
+
+  const myAssignment = duty?.assignments?.find((a) => a.leader_id === profile?.id) || null
+  const myAttendance = myAssignment?.attendance || null
+  const teammates = (duty?.assignments || [])
+    .filter((a) => a.leader_id !== profile?.id)
+    .map((a) => a.leader?.name)
+    .filter(Boolean)
+  const matesLabel = teammates.length ? ` — معك: ${teammates.join(' + ')}` : ''
 
   if (!isSupabaseConfigured) {
     return <div className="setup-notice"><b>تعذر الاتصال بالنظام.</b> راجع الإعدادات.</div>
@@ -140,7 +201,53 @@ export default function Home() {
       {loading || (isAdmin && !stats) ? (
         <div className="loading"><div className="spinner" />جارٍ تحميل البيانات...</div>
       ) : !isAdmin ? (
-        <div className="card empty"><p>استخدم البحث أو زر تسجيل مخالفة للبدء</p></div>
+        <>
+          {duty === undefined ? (
+            <div className="loading"><div className="spinner" />جارٍ التحقق من المناوبة...</div>
+          ) : myAssignment ? (
+            myAttendance ? (
+              <div className="duty-card done">
+                <div className="duty-head"><CheckCircle2 size={18} /> تم تأكيد حضورك اليوم بنجاح ✅</div>
+                <div className="duty-sub">
+                  {myAttendance.confirmed_at
+                    ? `سُجل الحضور الساعة ${new Date(myAttendance.confirmed_at).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}`
+                    : 'سُجل حضورك لهذا اليوم'}
+                  {matesLabel}
+                </div>
+              </div>
+            ) : (
+              <div className="duty-card alert">
+                <div className="duty-head"><BellRing size={18} /> لديك مناوبة اليوم على البوابة</div>
+                <div className="duty-sub">أنت مُكلّف بالمناوبة اليوم{matesLabel}</div>
+                <button className="btn btn-primary" disabled={confirming} onClick={handleConfirmDuty}>
+                  <CheckCircle2 size={16} /> تأكيد حضور المناوبة
+                </button>
+              </div>
+            )
+          ) : duty ? (
+            <div className="duty-card warn">
+              <div className="duty-head"><AlertTriangle size={17} /> أنت غير مُكلّف بالمناوبة اليوم ⚠️</div>
+              <div className="duty-sub">لا يمكنك تسجيل حضور البوابة لهذا اليوم لأن المناوبة ليست مسجلة باسمك.</div>
+            </div>
+          ) : (
+            <div className="duty-card muted">
+              <div className="duty-head"><CalendarDays size={17} /> لا توجد مناوبة لك اليوم</div>
+              <div className="duty-sub">راجع جدول الليدرز لمعرفة مناوباتك القادمة</div>
+            </div>
+          )}
+
+          {nextDuty && (
+            <button className="duty-card next" onClick={() => navigate('/schedule')}>
+              <span className="duty-next-inner">
+                <span className="duty-head"><CalendarDays size={17} /> مناوبتي القادمة</span>
+                <span className="duty-sub">
+                  📅 {dutyDateLabel(nextDuty.duty_date)} — {(nextDuty.assignments || []).map((a) => a.leader?.name).filter(Boolean).join(' + ')}
+                </span>
+              </span>
+              <ChevronLeft size={16} className="quick-arrow" />
+            </button>
+          )}
+        </>
       ) : (
         <>
           <div className="stat-grid">

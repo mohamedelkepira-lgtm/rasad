@@ -2187,3 +2187,116 @@ tr:nth-child(even) td { background: #F8FAFE; }
 }
 .qr-result-actions { display: flex; flex-direction: column; gap: 10px; margin-top: 16px; }
 .qr-result-actions .btn { width: 100%; }
+
+/* ===== جدول الليدرز (Leader Schedule) ===== */
+.sched-page { display: flex; flex-direction: column; gap: 14px; }
+.sched-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
+.sched-month-nav {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: 999px; padding: 4px;
+}
+.sched-nav-btn {
+  width: 34px; height: 34px; border-radius: 50%;
+  display: grid; place-items: center;
+  background: var(--brand-soft); color: var(--brand-700);
+  border: none; cursor: pointer; transition: background .15s ease;
+}
+.sched-nav-btn:hover { background: #dbe7fb; }
+.sched-month-title {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-weight: 800; color: var(--ink-900); font-size: 15px;
+  padding: 0 8px; min-width: 118px; justify-content: center;
+}
+.sched-admin-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.sched-gen-btn { padding: 9px 14px; font-size: 13.5px; }
+.sched-regen {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: none; border: none; color: var(--danger-600);
+  font-size: 12.5px; font-weight: 700; cursor: pointer; padding: 6px 2px;
+}
+.sched-regen:disabled { opacity: .5; cursor: default; }
+
+.sched-summary {
+  display: flex; flex-wrap: wrap; gap: 8px;
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--radius); padding: 10px 12px;
+}
+.sched-stat {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 12.5px; color: var(--ink-700);
+  background: var(--bg); border-radius: 999px; padding: 5px 11px;
+}
+.sched-stat b { color: var(--ink-900); }
+.sched-stat.ok { color: #15803d; background: #ecfdf3; }
+.sched-stat.warn { color: var(--warn-600); background: var(--warn-soft); }
+.sched-stat.near { color: var(--brand-700); background: var(--brand-soft); }
+
+.sched-list { display: flex; flex-direction: column; gap: 9px; }
+.sched-day {
+  text-align: right; width: 100%;
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--radius); padding: 12px 14px;
+  cursor: pointer; transition: box-shadow .15s ease, transform .15s ease, border-color .15s ease;
+  font-family: inherit;
+}
+.sched-day:hover { border-color: var(--brand-400); box-shadow: 0 3px 14px rgba(18,48,97,.08); }
+.sched-day.today { border-color: var(--brand-500); box-shadow: 0 0 0 3px rgba(37,99,235,.12); }
+.sched-day.mine { border-inline-start: 4px solid #16a34a; }
+.sched-day-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.sched-weekday { font-weight: 800; color: var(--ink-900); font-size: 14.5px; }
+.sched-date { color: var(--ink-500); font-size: 13px; }
+.sched-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  background: var(--bg); border: 1px solid var(--line);
+  color: var(--ink-700); border-radius: 999px;
+  padding: 4px 10px; font-size: 12.5px; font-weight: 600;
+}
+.chip-me { background: #ecfdf3; border-color: #bbe7c9; color: #15803d; }
+.chip-check { color: #16a34a; }
+
+.sched-modal { max-width: min(94vw, 480px); }
+.sched-rows { display: flex; flex-direction: column; gap: 10px; padding: 4px 2px 8px; }
+.sched-row {
+  background: var(--bg); border: 1px solid var(--line);
+  border-radius: calc(var(--radius) - 2px); padding: 11px 12px;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.sched-row.mine { border-color: #bbe7c9; background: #f2fbf5; }
+.sched-row-main { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.sched-slot { font-size: 11.5px; font-weight: 700; color: var(--ink-400); background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 2px 8px; }
+.sched-name { font-weight: 800; color: var(--ink-900); font-size: 14.5px; flex: 1; min-width: 90px; }
+.sched-badge { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 700; border-radius: 999px; padding: 3px 9px; }
+.sched-badge.present { color: #15803d; background: #ecfdf3; }
+.sched-badge.pending { color: var(--warn-600); background: var(--warn-soft); }
+.sched-badge.absent { color: var(--danger-600); background: #fdeeee; }
+.sched-time { font-size: 12px; color: var(--ink-500); }
+.sched-swap {
+  font-family: inherit; font-size: 13px; color: var(--ink-700);
+  border: 1px solid var(--line); border-radius: 8px;
+  background: var(--surface); padding: 7px 9px; max-width: 100%;
+}
+.sched-confirm { width: 100%; justify-content: center; }
+.sched-empty { align-items: center; gap: 10px; display: flex; flex-direction: column; color: var(--brand-700); }
+.sched-empty p { color: var(--ink-700); }
+
+/* ===== كارت المناوبة في الرئيسية ===== */
+.duty-card {
+  display: block; width: 100%; text-align: right;
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--radius); padding: 14px;
+  margin-bottom: 12px; font-family: inherit;
+}
+.duty-card.alert { border-color: #f3c98b; background: linear-gradient(180deg, #fffaf1, #fff); box-shadow: 0 4px 16px rgba(217,119,6,.09); }
+.duty-card.done { border-color: #bbe7c9; background: linear-gradient(180deg, #f4fcf7, #fff); }
+.duty-card.warn { border-color: #f3d9a0; background: #fffdf7; }
+.duty-card.muted { color: var(--ink-500); }
+button.duty-card.next { cursor: pointer; transition: border-color .15s ease, box-shadow .15s ease; position: relative; }
+button.duty-card.next:hover { border-color: var(--brand-400); box-shadow: 0 3px 14px rgba(18,48,97,.08); }
+.duty-head { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 14.5px; color: var(--ink-900); margin-bottom: 5px; }
+.duty-card.alert .duty-head { color: var(--warn-600); }
+.duty-card.done .duty-head { color: #15803d; }
+.duty-sub { font-size: 13px; color: var(--ink-500); line-height: 1.7; margin-bottom: 10px; display: block; }
+.duty-card.next .duty-sub { margin-bottom: 0; }
+.duty-next-inner { display: block; padding-inline-end: 22px; }

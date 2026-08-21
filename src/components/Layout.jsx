@@ -1,5 +1,5 @@
 import { NavLink, useNavigate } from 'react-router-dom'
-import { Radar, Home, Users, ListChecks, BarChart3, Plus, ScanLine } from 'lucide-react'
+import { Radar, Home, Users, ListChecks, BarChart3, Plus, ScanLine, CalendarDays } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import AnimatedOutlet from './AnimatedOutlet'
 import Header from './Header'
@@ -43,6 +43,10 @@ export default function Layout() {
           <NavLink to="/scan" onClick={haptic} className={({ isActive }) => 'nav-item' + (isActive ? ' active' : '')}>
             <span className="nav-icon"><ScanLine size={22} strokeWidth={2.1} /></span>
             <span className="nav-label">مسح QR</span>
+          </NavLink>
+          <NavLink to="/schedule" onClick={haptic} className={({ isActive }) => 'nav-item' + (isActive ? ' active' : '')}>
+            <span className="nav-icon"><CalendarDays size={22} strokeWidth={2.1} /></span>
+            <span className="nav-label">الجدول</span>
           </NavLink>
           {isAdmin && (
             <NavLink to="/violations" onClick={haptic} className={({ isActive }) => 'nav-item' + (isActive ? ' active' : '')}>

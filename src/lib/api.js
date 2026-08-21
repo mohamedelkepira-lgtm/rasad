@@ -1,6 +1,7 @@
 import { supabase } from './supabase'
 import { monthKey, todayRange } from './utils'
 import { withCache, invalidateCache } from './cache'
+import { toISODate, monthDates, buildFillSchedule } from './scheduleGen'
 
 // ---------- Cache keys & TTL ----------
 const TTL = {
@@ -287,4 +288,158 @@ export async function fetchViolationsByRange(fromISO, toISO) {
   const { data, error } = await q
   if (error) throw error
   return data || []
+}
+
+// ---------- جدول مناوبة الليدرز ----------
+const SCHEDULE_SELECT = `
+  id, duty_date,
+  assignments:schedule_assignments (
+    id, slot, leader_id,
+    leader:profiles!schedule_assignments_leader_id_fkey ( id, name ),
+    attendance:schedule_attendance ( id, status, confirmed_at )
+  )`
+
+function monthBounds(year, month) {
+  const mm = String(month).padStart(2, '0')
+  const lastDay = new Date(year, month, 0).getDate()
+  return { start: `${year}-${mm}-01`, end: `${year}-${mm}-${String(lastDay).padStart(2, '0')}` }
+}
+
+// جدول شهر كامل (أيام + تكليفات + حضور)
+export async function fetchScheduleMonth(year, month) {
+  const { start, end } = monthBounds(year, month)
+  const { data, error } = await supabase
+    .from('schedule_days')
+    .select(SCHEDULE_SELECT)
+    .gte('duty_date', start)
+    .lte('duty_date', end)
+    .order('duty_date', { ascending: true })
+  if (error) throw error
+  return data || []
+}
+
+// يوم واحد بالتفصيل
+export async function fetchScheduleDay(dayId) {
+  const { data, error } = await supabase
+    .from('schedule_days')
+    .select(SCHEDULE_SELECT)
+    .eq('id', dayId)
+    .maybeSingle()
+  if (error) throw error
+  return data
+}
+
+// قائمة القادة (لاستبدال مناوب أو توليد الجدول)
+export async function fetchLeadersList() {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id, name')
+    .eq('role', 'leader')
+    .order('name', { ascending: true })
+  if (error) throw error
+  return data || []
+}
+
+// إنشاء جدول الشهر — يكمل الأيام الناقصة فقط ويحافظ على الموجود
+export async function generateScheduleMonth(year, month) {
+  const leaders = await fetchLeadersList()
+  if (!leaders.length) throw new Error('لا يوجد قادة مسجلين في النظام')
+  const ids = leaders.map((l) => l.id)
+  const dates = monthDates(year, month)
+
+  const existing = await fetchScheduleMonth(year, month)
+  const existingByDate = new Map(existing.map((d) => [d.duty_date, d]))
+  const missing = dates.filter((ds) => !existingByDate.has(ds))
+  if (!missing.length) return { created: 0 }
+
+  // عدالة الاستكمال: نحسب مناوبات كل قائد الموجودة أصلًا هذا الشهر
+  const counts = {}
+  for (const day of existing) {
+    for (const a of day.assignments || []) counts[a.leader_id] = (counts[a.leader_id] || 0) + 1
+  }
+  const plan = buildFillSchedule(ids, missing.length, counts)
+
+  const { data: insertedDays, error } = await supabase
+    .from('schedule_days')
+    .insert(missing.map((ds) => ({ duty_date: ds })))
+    .select('id, duty_date')
+  if (error) throw error
+
+  const idByDate = new Map(insertedDays.map((d) => [d.duty_date, d.id]))
+  const rows = []
+  missing.forEach((ds, i) => {
+    const dayId = idByDate.get(ds)
+    ;(plan[i] || []).forEach((leaderId, idx) => rows.push({ day_id: dayId, leader_id: leaderId, slot: idx + 1 }))
+  })
+  if (rows.length) {
+    const { error: aerr } = await supabase.from('schedule_assignments').insert(rows)
+    if (aerr) throw aerr
+  }
+  return { created: missing.length }
+}
+
+// إعادة إنشاء كامل للشهر: يحذف أيام الشهر (والتكليفات تُحذف تلقائيًا Cascade) ثم يوزع من جديد
+export async function regenerateScheduleMonth(year, month) {
+  const { start, end } = monthBounds(year, month)
+  const { error } = await supabase
+    .from('schedule_days')
+    .delete()
+    .gte('duty_date', start)
+    .lte('duty_date', end)
+  if (error) throw error
+  return generateScheduleMonth(year, month)
+}
+
+// استبدال قائد في يوم (Override للأدمن حتى في نفس اليوم) — الحضور القديم يُلغى
+export async function replaceAssignmentLeader(assignmentId, newLeaderId) {
+  const { error: delErr } = await supabase
+    .from('schedule_attendance')
+    .delete()
+    .eq('assignment_id', assignmentId)
+  if (delErr) throw delErr
+  const { error } = await supabase
+    .from('schedule_assignments')
+    .update({ leader_id: newLeaderId })
+    .eq('id', assignmentId)
+  if (error) throw error
+}
+
+// تأكيد حضور القائد لمناوبته — RLS يمنع أي شخص غير مكلف بنفس التكليف
+export async function confirmMyAttendance(assignmentId) {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('غير مسجل الدخول')
+  const { data, error } = await supabase
+    .from('schedule_attendance')
+    .insert({ assignment_id: assignmentId, leader_id: user.id, confirmed_by: user.id, status: 'PRESENT' })
+    .select('id, status, confirmed_at')
+    .single()
+  if (error) throw error
+  return data
+}
+
+// مناوبة اليوم (تُستخدم في الصفحة الرئيسية)
+export async function fetchTodayDuty() {
+  const today = toISODate(new Date())
+  const { data, error } = await supabase
+    .from('schedule_days')
+    .select(SCHEDULE_SELECT)
+    .eq('duty_date', today)
+    .maybeSingle()
+  if (error) throw error
+  return data
+}
+
+// أقرب مناوبة قادمة لقائد معين
+export async function fetchMyNextDuty(leaderId) {
+  const today = toISODate(new Date())
+  const { data, error } = await supabase
+    .from('schedule_assignments')
+    .select('id, slot, day:schedule_days!inner(id, duty_date)')
+    .eq('leader_id', leaderId)
+    .gte('schedule_days.duty_date', today)
+    .limit(120)
+  if (error) throw error
+  if (!data || !data.length) return null
+  const sorted = [...data].sort((a, b) => String(a.day.duty_date).localeCompare(String(b.day.duty_date)))
+  return fetchScheduleDay(sorted[0].day.id)
 }
