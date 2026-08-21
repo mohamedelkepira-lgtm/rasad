@@ -36,11 +36,11 @@ export default function Header() {
   const roleLabel = isAdmin ? 'مدير النظام' : 'Leader'
   const firstName = profile?.name?.split(' ')[0] || 'مستخدم'
 
-  const navItems = isAdmin ? NAV_ITEMS : NAV_ITEMS.filter((i) => i.to !== '/reports')
+  const navItems = isAdmin ? NAV_ITEMS : NAV_ITEMS.filter((i) => i.to !== '/reports' && i.to !== '/violations')
 
-  // إشعارات: مخالفات اليوم (عدد حقيقي من النظام)
+  // إشعارات: مخالفات اليوم (عدد حقيقي من النظام) — للأدمن فقط
   useEffect(() => {
-    if (!isSupabaseConfigured) return
+    if (!isSupabaseConfigured || !isAdmin) return
     let cancelled = false
     ;(async () => {
       try {
@@ -49,7 +49,7 @@ export default function Header() {
       } catch { /* silent */ }
     })()
     return () => { cancelled = true }
-  }, [])
+  }, [isAdmin])
 
   // بحث فوري
   useEffect(() => {
@@ -225,10 +225,12 @@ export default function Header() {
             <Sun size={26} strokeWidth={2} className="header-greeting-sun" />
           </div>
           <div className="header-greeting-row">
-            <span className="header-greeting-status">
-              <span className="header-greeting-dot" />
-              {notifCount > 0 ? `${notifCount} مخالفة اليوم` : 'لا مخالفات اليوم'}
-            </span>
+            {isAdmin && (
+              <span className="header-greeting-status">
+                <span className="header-greeting-dot" />
+                {notifCount > 0 ? `${notifCount} مخالفة اليوم` : 'لا مخالفات اليوم'}
+              </span>
+            )}
             <button
               className="header-greeting-action"
               onClick={() => { haptic(); navigate('/add') }}

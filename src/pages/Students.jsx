@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Search, UserPlus, Users, Pencil, CheckCircle2, XCircle, ChevronLeft, ChevronDown } from 'lucide-react'
-import { getStudentsWithCounts, addStudent, updateStudent } from '../lib/api'
+import { getStudentsWithCounts, fetchStudents, addStudent, updateStudent } from '../lib/api'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 import { monthKey } from '../lib/utils'
@@ -26,14 +26,15 @@ export default function Students() {
     if (!isSupabaseConfigured) return
     setLoading(true)
     try {
-      const data = await getStudentsWithCounts(monthKey())
+      // أعداد المخالفات الشهرية للأدمن فقط
+      const data = isAdmin ? await getStudentsWithCounts(monthKey()) : await fetchStudents()
       setStudents(data)
     } catch {
       setStudents([])
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [isAdmin])
 
   useEffect(() => {
     load()
@@ -139,7 +140,9 @@ export default function Students() {
                 </div>
               </div>
               <div className="row-meta">
-                <span className={`badge ${s.month_count > 0 ? '' : 'gray'}`}>{s.month_count} هذا الشهر</span>
+                {isAdmin && (
+                  <span className={`badge ${s.month_count > 0 ? '' : 'gray'}`}>{s.month_count} هذا الشهر</span>
+                )}
               </div>
               {isAdmin && (
                 <div className="row-actions">

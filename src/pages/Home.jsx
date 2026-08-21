@@ -21,8 +21,10 @@ export default function Home() {
   const todayLabel = new Date().toLocaleDateString('ar-EG', { weekday: 'long', day: 'numeric', month: 'long' })
 
   const load = useCallback(async () => {
-    if (!isSupabaseConfigured) {
+    // الإحصائيات وسجل المخالفات للأدمن فقط — القائد يسجل المخالفات فقط
+    if (!isSupabaseConfigured || !isAdmin) {
       setLoading(false)
+      setStats(null)
       return
     }
     setLoading(true)
@@ -33,7 +35,7 @@ export default function Home() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [isAdmin])
 
   useEffect(() => {
     load()
@@ -135,8 +137,10 @@ export default function Home() {
         {(focused || q) && searching && <div className="loading" style={{ padding: 16 }}><div className="spinner" />بحث...</div>}
       </div>
 
-      {loading ? (
+      {loading || (isAdmin && !stats) ? (
         <div className="loading"><div className="spinner" />جارٍ تحميل البيانات...</div>
+      ) : !isAdmin ? (
+        <div className="card empty"><p>استخدم البحث أو زر تسجيل مخالفة للبدء</p></div>
       ) : (
         <>
           <div className="stat-grid">
@@ -164,7 +168,7 @@ export default function Home() {
               <div className="card-title"><ClipboardList size={16} /> أحدث المخالفات</div>
               <button className="link-btn" onClick={() => navigate('/violations')}>عرض الكل</button>
             </div>
-            {stats.recent.length === 0 ? (
+            {(stats?.recent?.length ?? 0) === 0 ? (
               <div className="empty"><p>لا توجد مخالفات مسجّلة بعد</p></div>
             ) : (
               <div className="list">
@@ -187,7 +191,7 @@ export default function Home() {
             )}
           </div>
 
-          {stats.topStudents.length > 0 && (
+          {(stats?.topStudents?.length ?? 0) > 0 && (
             <div className="card">
               <div className="card-header">
                 <div className="card-title"><TrendingUp size={16} /> أكثر الطلاب هذا الشهر</div>

@@ -44,10 +44,12 @@ export default function Layout() {
             <span className="nav-icon"><ScanLine size={22} strokeWidth={2.1} /></span>
             <span className="nav-label">مسح QR</span>
           </NavLink>
-          <NavLink to="/violations" onClick={haptic} className={({ isActive }) => 'nav-item' + (isActive ? ' active' : '')}>
-            <span className="nav-icon"><ListChecks size={22} strokeWidth={2.1} /></span>
-            <span className="nav-label">المخالفات</span>
-          </NavLink>
+          {isAdmin && (
+            <NavLink to="/violations" onClick={haptic} className={({ isActive }) => 'nav-item' + (isActive ? ' active' : '')}>
+              <span className="nav-icon"><ListChecks size={22} strokeWidth={2.1} /></span>
+              <span className="nav-label">المخالفات</span>
+            </NavLink>
+          )}
           {isAdmin && (
             <NavLink to="/reports" onClick={haptic} className={({ isActive }) => 'nav-item' + (isActive ? ' active' : '')}>
               <span className="nav-icon"><BarChart3 size={22} strokeWidth={2.1} /></span>

@@ -53,8 +53,8 @@ export default function App() {
                 <Route path="/add" element={<AddViolation />} />
                 <Route path="/students" element={<Students />} />
                 <Route path="/students/:id" element={<StudentPage />} />
-                <Route path="/violations" element={<Violations />} />
-                <Route path="/violations/:id" element={<ViolationDetail />} />
+                <Route path="/violations" element={<AdminOnly><Violations /></AdminOnly>} />
+                <Route path="/violations/:id" element={<AdminOnly><ViolationDetail /></AdminOnly>} />
                 <Route path="/reports" element={<AdminOnly><Reports /></AdminOnly>} />
                 <Route path="/scan" element={<Scan />} />
               </Route>
