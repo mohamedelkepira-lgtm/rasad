@@ -23,24 +23,55 @@ export function AuthProvider({ children }) {
     return data
   }, [])
 
+  const decodeJwt = (token) => {
+    try { return JSON.parse(atob(token.split('.')[1])) } catch { return null }
+  }
+
+  const checkPasswordChanged = useCallback(async (s) => {
+    if (!s?.access_token) return false
+    const payload = decodeJwt(s.access_token)
+    const iat = payload?.iat
+    if (!iat) return false
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user?.updated_at) return false
+      const updatedAtSec = Math.floor(new Date(user.updated_at).getTime() / 1000)
+      // إذا تم تحديث بيانات المستخدم (مثل كلمة المرور) بعد إصدار التوكن، اجبر تسجيل الخروج
+      return updatedAtSec > iat + 2 // هامش ثانيتين لتجنب race
+    } catch { return false }
+  }, [])
+
+  const forceLogoutIfNeeded = useCallback(async (s) => {
+    if (!s) return s
+    const changed = await checkPasswordChanged(s)
+    if (changed) {
+      await supabase.auth.signOut()
+      setProfile(null)
+      return null
+    }
+    return s
+  }, [checkPasswordChanged])
+
   useEffect(() => {
     if (!isSupabaseConfigured) {
       setLoading(false)
       return
     }
-    supabase.auth.getSession().then(({ data: { session: s } }) => {
-      setSession(s)
-      if (s) loadProfile(s.user.id).finally(() => setLoading(false))
+    supabase.auth.getSession().then(async ({ data: { session: s } }) => {
+      const valid = await forceLogoutIfNeeded(s)
+      setSession(valid)
+      if (valid) loadProfile(valid.user.id).finally(() => setLoading(false))
       else setLoading(false)
     })
 
-    const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => {
-      setSession(s)
-      if (s) loadProfile(s.user.id)
+    const { data: sub } = supabase.auth.onAuthStateChange(async (_e, s) => {
+      const valid = await forceLogoutIfNeeded(s)
+      setSession(valid)
+      if (valid) loadProfile(valid.user.id)
       else setProfile(null)
     })
     return () => sub.subscription.unsubscribe()
-  }, [loadProfile])
+  }, [loadProfile, forceLogoutIfNeeded])
 
   const login = useCallback(async (username, password) => {
     const email = authEmailFromUsername(username)
