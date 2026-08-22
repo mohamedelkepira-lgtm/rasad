@@ -2306,8 +2306,8 @@ button.duty-card.next:hover { border-color: var(--brand-400); box-shadow: 0 3px 
 .header-notif.notif-open { background: var(--brand-soft); color: var(--brand-700); }
 .notif-backdrop { position: fixed; inset: 0; z-index: 90; }
 .notif-panel {
-  position: absolute; top: calc(100% + 12px); inset-inline-end: -6px;
-  width: min(92vw, 340px);
+  position: fixed; top: 64px; left: 50%; transform: translateX(-50%);
+  width: min(92vw, 360px);
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 16px;
